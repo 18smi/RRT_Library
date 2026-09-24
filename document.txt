@@ -1,0 +1,188 @@
+RRT_Visualiser.h relies on SFML 3.0.2
+
+Liang–Barsky‑style clipping logic for hyper rectangle constraints
+
+to preform RRT_Visualiser::drawProject() you need to define bounds through RRT_Visualiser::setGeometricBounds() or RRT_Visualiser::estimateGeometricBounds()
+
+create your own sampling strategy, distance calculation or obstacle via there base class
+
+The root node of every tree uses root_index (UINT_MAX) as its parent
+
+all state space points are defined as a std::vector<double>
+all geometric positions are defined as std::array<double, 3>
+
+path is a vector of points that starts with the start point and ends with the end point
+
+The SafetySettings struct controls how finely the system interpolates between two states and
+the safety margin that is applied during collision checking
+
+System::validSegment() uses PointsToPath and StateToGeometry to check movement from start to end against constraints and obstacles
+
+when creating your own drawable constrains the windows viewpoint is set up to convert world position into window position
+
+
+note = adjustment radius for RRT* and Informed_RRT* are fixed as it seems to work best
+
+
+--------------- TO DO ---------------
+improve ownership clarity
+implement projectDraw
+implement obstacles
+implement sobol sampling
+add more constrain options (convex hull)
+add more path optimisation options (smoothing)
+add NN speedup options
+wrapping is difficult
+implement exhaustiveShortcutting (Dijkstra?)
+speed up visualiser (point clouds?)
+
+
+----------------- KNOWN BUGS -----------------
+RRT* with AxisSequentialPath constraint collision (probably caused by an axis order mixup)
+
+
+
+
+--------------- ARCHITECTURE ---------------
+RRT -
+- System
+- start point (std::vector<double>)
+- end point (std::vector<double>)
+- max extend (double)
+- SamplingStrategy
+- DistanceStrategy
+- CostFunction (if needed)
+
+System -
+- min bound (std::vector<double>)
+- max bound (std::vector<double>)
+- wrapping (std::vector<bool>)
+- StateToGeometry
+- PointsToPath
+- SafetySettings
+
+SafetySettings -
+- safety margin for the constraints (double)
+- safety margin for the obstacles (double)
+- interpolation steps (unsigned int)
+
+
+------------ Key Concepts ------------
+State Space - N dimension planing space represented by std::vector<double>
+Constraint - a forbidden region in state space
+Geometric Space - the physical 3D world represented by std::array<double,3>
+Obstacle - a physical obstacle (forbidden region) in geometric space
+PointsToPath - converts 2 state space points into a state space continues path
+StateToGeometry - converts a state space point into 3 levels of bounding areas (axis aligned bounding box, capsule, SDF)
+
+
+
+
+classes use pascal case
+functions use camel case
+variables use snake case
+
+
+
+order
+    - RRT
+    - RRT*
+    - bi RRT
+    - RRT connect
+    - informed RRT*
+
+    - CBiRRT
+
+    - kino RRT
+    - LQR‑RRT\*
+    - BIT*
+    - FMT*
+    - PRM
+    - PRM*
+
+    - SST
+    - RRTX
+    - Lazy PRM\*
+    - Anytime BIT\*
+
+
+
+
+started in the second semester of my first year
+RRT, RRT*, Bi-RRT, RRT Connect, Informed RRT* as well as the core structure was done during my first years summer
+
+
+
+
+
+------------------------ Hello World ------------------------
+#include "RRT.h"
+#include "RRT_Visualizer.h"
+#include "Path_Refinement.h"
+
+
+int main() {
+    sf::RenderWindow window(sf::VideoMode({1000, 500}), "RRT display");//, sf::Style::Fullscreen
+
+    System sys({0, 0}, {100, 100}, {false, false}, new PointGeometry, new AxisSequentialPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 20}, {32, 95})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 97}, {32, 100})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 0}, {62, 10})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 20}, {62, 70})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperSphere(10, {85, 35})));
+
+
+    RRT alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
+    //RRT_Star alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new AdditiveDistance, new DistanceCost(new AdditiveDistance, {false, false}));
+    //Bi_RRT alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
+    //RRT_Connect alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
+    //Informed_RRT_Star alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance, new DistanceCost(new EuclidianDistance, {false, false}));
+    RRT_Visualiser vis(window, sys);
+
+    vis.setGeometricBounds({0, 0, 0}, {100, 100, 0});
+    DirectPositionFromPoint position_from_point;
+
+    sf::Clock clock;
+    while (window.isOpen()) {
+        while (std::optional<sf::Event> event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+            }
+
+            if (auto key = event->getIf<sf::Event::KeyPressed>()) {
+                if (key->code == sf::Keyboard::Key::Escape) {
+                    window.close();
+                }
+            }
+        }
+
+
+        if (clock.getElapsedTime().asMilliseconds() > 10) {
+            vis.camProjectDraw(alg, position_from_point, 0, 0, 0);
+            alg.step();
+            clock.restart();
+        }
+    }
+
+    std::vector<std::vector<double>> path = alg.getPath();
+    for (auto & i : path) {
+        std::cout << "(" << i[0];
+        for (int j = 1; j < i.size(); j++) {
+            std::cout << ", " << i[j];
+        }
+        std::cout << ")\n";
+    }
+
+
+    std::cout << "\n\nSmoothed Path\n";
+    const std::vector<std::vector<double>> smoothed = refine::greedyShortcutting(path, sys);
+    for (auto & i : smoothed) {
+        std::cout << "(" << i[0];
+        for (int j = 1; j < i.size(); j++) {
+            std::cout << ", " << i[j];
+        }
+        std::cout << ")\n";
+    }
+
+    return 0;
+}
