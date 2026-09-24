@@ -7,7 +7,7 @@
 int main() {
     sf::RenderWindow window(sf::VideoMode({1000, 500}), "RRT display");//, sf::Style::Fullscreen
 
-    System sys({0, 0}, {100, 100}, {false, false}, new PointGeometry, new AxisSequentialPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
+    System sys({0, 0}, {100, 100}, {false, false}, new NoGeometry, new AxisSequentialPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
     sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 20}, {32, 95})));
     sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 97}, {32, 100})));
     sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 0}, {62, 10})));

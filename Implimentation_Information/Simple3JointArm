@@ -1,0 +1,29 @@
+Simple3JointArm is a StateToGeometry child that is designed for a robotic arm with three
+independently actuated rotary joints connected by two fixed size links
+
+the 3 independently actuated rotary joints consist of:
+    1. Rotation around the central vertical axis (base)
+    2. Controls the angle between the first link and the base (shoulder)
+    3. Placed between the first and second link (elbow)
+
+these 3 joints give end effector access to 3 dimensional space
+
+
+
+this model uses radians and capsule links
+
+
+base angle of 0 = x+
+base angle of 0.5PI = y
+base angle of PI = x-
+base angle of 1.5PI = y-
+
+shoulder angle of 0 = 0 horizontal
+shoulder angle of 0.5PI = vertical up
+shoulder angle of PI = horizontal backwards
+shoulder angle of 1.5PI = vertical down
+
+elbow angle of 0 = aligned with previous link
+elbow angle of 0.5PI = a 90 to the previous link
+elbow angle of PI = next to previous link
+elbow angle of 1.5PI = a 90 to the previous link

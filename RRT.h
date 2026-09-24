@@ -12,6 +12,7 @@
 #include <vector>
 #include <memory>
 #include <optional>
+#include <SFML/System/Clock.hpp>
 #define root_index UINT_MAX
 
 
@@ -184,7 +185,23 @@ private:
     std::array<double, 3> max;
 };
 struct Capsule {
+    Capsule(const std::array<double, 3> &position1, const std::array<double, 3> &position2, const double radius) : position1(position1), position2(position2), radius(radius) {}
 
+    [[nodiscard]] std::array<double, 3> getPosition1() const {
+        return position1;
+    }
+    [[nodiscard]] std::array<double, 3> getPosition2() const {
+        return position2;
+    }
+    [[nodiscard]] double getRadius() const {
+        return radius;
+    }
+
+
+private:
+    std::array<double, 3> position1;
+    std::array<double, 3> position2;
+    double radius;
 };
 struct SDF {
 
@@ -198,13 +215,78 @@ public:
     [[nodiscard]] virtual Capsule getCapsule(const std::vector<double>&) const = 0;
     [[nodiscard]] virtual SDF getSDF(const std::vector<double>&) const = 0;
 };
-class PointGeometry final : public StateToGeometry {
+class NoGeometry final : public StateToGeometry {
 public:
-    [[nodiscard]] BoundingBox getBoundingBox(const std::vector<double> &point) const override {
-        return BoundingBox{0, 0, 0, 0, 0, 0};
-    }
-    [[nodiscard]] Capsule getCapsule(const std::vector<double> &point) const override {return Capsule{};}
+    [[nodiscard]] BoundingBox getBoundingBox(const std::vector<double> &point) const override {return BoundingBox{0, 0, 0, 0, 0, 0};}
+    [[nodiscard]] Capsule getCapsule(const std::vector<double> &point) const override {return Capsule{{0, 0, 0}, {0, 0, 0}, 0};}
     [[nodiscard]] SDF getSDF(const std::vector<double> &point) const override {return SDF{};}
+};
+class Simple3JointArm final : public StateToGeometry {
+public:
+    Simple3JointArm(const double length1, const double length2, const double link_thickness) : length1(length1), length2(length2), link_thickness(link_thickness) {
+
+    }
+
+
+    [[nodiscard]] BoundingBox getBoundingBox(const std::vector<double> &point) const override {
+        if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
+
+        const std::array<std::array<double, 3>, 3> joint_positions = getJointPositions(point);
+
+        double x_min = joint_positions[0][0] - link_thickness;
+        double x_max = joint_positions[0][0] + link_thickness;
+        double y_min = joint_positions[0][1] - link_thickness;
+        double y_max = joint_positions[0][1] + link_thickness;
+        double z_min = joint_positions[0][2] - link_thickness;
+        double z_max = joint_positions[0][2] + link_thickness;
+
+        for (unsigned int i = 1; i < 3; i++) {
+            x_min = std::min(joint_positions[i][0] - link_thickness, x_min);
+            x_max = std::max(joint_positions[i][0] + link_thickness, x_max);
+            y_min = std::min(joint_positions[i][1] - link_thickness, y_min);
+            y_max = std::max(joint_positions[i][1] + link_thickness, y_max);
+            z_min = std::min(joint_positions[i][2] - link_thickness, z_min);
+            z_max = std::max(joint_positions[i][2] + link_thickness, z_max);
+        }
+        return BoundingBox{x_min, x_max, y_min, y_max, z_min, z_max};
+    }
+    [[nodiscard]] Capsule getCapsule(const std::vector<double> &point) const override {
+        if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
+
+    }
+    [[nodiscard]] SDF getSDF(const std::vector<double> &point) const override {
+        if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
+
+    }
+
+private:
+    double length1;
+    double length2;
+    double link_thickness;
+
+    [[nodiscard]] std::array<std::array<double, 3>, 3> getJointPositions(const std::vector<double> &point) const {
+        if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
+
+        std::array<std::array<double, 3>, 3> result{};
+
+        const double joint1_xy = cos(point[1])*length1;
+        const double joint2_xy = joint1_xy + cos(point[2])*length2;
+
+        const double joint1_x = cos(point[0])*joint1_xy;
+        const double joint1_y = sin(point[0])*joint1_xy;
+        const double joint1_z = sin(point[1])*length1;
+
+        //need to be edited to make 0 = aligned with point[1]
+        const double joint2_x = cos(point[0])*joint2_xy;
+        const double joint2_y = sin(point[0])*joint2_xy;
+        const double joint2_z = joint1_z + sin(point[2])*length2;
+
+        result[0] = {0, 0, 0};
+        result[1] = {joint1_x, joint1_y, joint1_z};
+        result[2] = {joint2_x, joint2_y, joint2_z};
+
+        return result;
+    }
 };
 //common types (7 dof arm, SE2, SE3, more)
 
@@ -511,7 +593,7 @@ private:
     }
     [[nodiscard]] Capsule createCapsule(const std::vector<double> &start, const std::vector<double> &end) const {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (System::createCapsule)");
-        return Capsule{};
+        return Capsule{{0, 0, 0}, {0, 0, 0}, 0};
     }
     [[nodiscard]] SDF createSDF(const std::vector<double> &start, const std::vector<double> &end) const {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (System::createSDF)");
