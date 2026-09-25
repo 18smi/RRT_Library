@@ -1,2 +1,1 @@
-contact details
-email: 18smith.ben@gmail.com
+contact me via my email: 18smith.ben@gmail.com
