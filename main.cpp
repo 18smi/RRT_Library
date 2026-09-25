@@ -7,13 +7,23 @@
 int main() {
     sf::RenderWindow window(sf::VideoMode({500, 500}), "RRT display");//, sf::Style::Fullscreen
 
-    System sys({0, 0, 0}, {std::numbers::pi, 2*std::numbers::pi, 2*std::numbers::pi}, {true, false, true}, std::make_unique<Simple3JointArm>(30, 20, 2), std::make_unique<LinearPath>(), {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
-    //sys.addConstraint
+    System sys({0, 0, 0}, {360, 360, 360}, {true, false, true}, std::make_unique<Simple3JointArm>(30, 20, 2), std::make_unique<LinearPath>(), {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
+    sys.addConstraint(std::make_unique<DrawableHyperRectangle>(std::vector<double>{0, 0, 170}, std::vector<double>{360, 360, 190}));// stops the arm hitting itself
+    sys.addObstacle(std::make_unique<DrawableCuboid>(std::array<double, 3>{0, 0, 0}, std::array<double, 3>{100, 100, 100}, std::array<double, 3>{0, 0, 0}));// platform the arm is on
 
-    std::vector<double> start_position {0, 20, 30};
-    std::vector<double> end_position {30, 20, 30};
+    //workspace obstacles
 
-    RRT alg(sys, Simple3JointArm::PositionToPoint(start_position), Simple3JointArm::PositionToPoint(end_position), (1.0/90)*std::numbers::pi, std::make_unique<BiasedSampling>(Simple3JointArm::PositionToPoint(end_position), 0.01) , std::make_unique<WeightedEuclidianDistance>(std::vector<double>{1, 2, 2}));
+    std::vector<double> start_point = Simple3JointArm::PositionToPoint(std::array<double, 3>{0, 20, 30}, 30, 20);
+    std::vector<double> end_point = Simple3JointArm::PositionToPoint(std::array<double, 3>{10, 0.5, -30}, 30, 20);
+    for (unsigned int i = 0; i < 3; i++) {
+        start_point[i] *= 360 / std::numbers::pi;
+        end_point[i] *= 360 / std::numbers::pi;
+        start_point[i] = fmod(start_point[i] + 360,  360);
+        end_point[i] = fmod(end_point[i] + 360,  360);
+        std::cout << start_point[i]  << ", " << end_point[i] << std::endl;
+    }// converts radians into degrees
+
+    RRT alg(sys, start_point, end_point, 0.1, std::make_unique<BiasedSampling>(end_point, 0.1) , std::make_unique<WeightedEuclidianDistance>(std::vector<double>{1, 2, 2}));
     RRT_Visualiser vis(window, sys);
 
     vis.setGeometricBounds({-50, -50, 0}, {50, 50, 50});
@@ -37,7 +47,7 @@ int main() {
 
         if (clock.getElapsedTime().asMilliseconds() > 10) {
             vis.camProjectDraw(alg, position_from_point, 0, 0, 0);
-            //vis.drawFlat(alg, 0, 1);
+            //vis.drawFlat(alg, 1, 2);
             alg.step();
             clock.restart();
         }

@@ -22,7 +22,7 @@ note = adjustment radius for RRT* and Informed_RRT* are fixed as it seems to wor
 
 --------------- TO DO ---------------
 look continuous collision detection instead of desecrate (safer)
-implement projectDraw
+think of a clean way of doing 3D visuals
 implement obstacles
 add NN speedup options
 wrapping is difficult
