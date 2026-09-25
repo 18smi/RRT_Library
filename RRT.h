@@ -121,7 +121,7 @@ public:
 };
 class DistanceCost final : public CostFunction{
 public:
-    DistanceCost(DistanceStrategy* distance_strategy, const std::vector<bool> &wrapping) : distance_strategy(distance_strategy), wrapping(wrapping){}
+    DistanceCost(std::unique_ptr<DistanceStrategy> distance_strategy, const std::vector<bool> &wrapping) : distance_strategy(std::move(distance_strategy)), wrapping(wrapping){}
 
     [[nodiscard]] double calculateCost(const std::vector<double> &start, const std::vector<double> &end) override {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (DistanceCost)");
@@ -237,6 +237,9 @@ public:
 
     }
 
+    [[nodiscard]] static std::vector<double> PositionToPoint(std::vector<double> &position) {
+
+    }
 
     [[nodiscard]] BoundingBox getBoundingBox(const std::vector<double> &point) const override {
         if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
@@ -496,9 +499,8 @@ struct SafetySettings {
 
 class System {
 public:
-    System(const std::vector<double> &min_bound, const std::vector<double> &max_bound, const std::vector<bool> &wrapping, StateToGeometry* state_to_geometry, PointsToPath* points_to_path, const SafetySettings &safety_settings) : min_bound(min_bound), max_bound(max_bound), wrapping(wrapping), state_to_geometry(state_to_geometry), points_to_path(points_to_path), safety_settings(safety_settings) {
+    System(const std::vector<double> &min_bound, const std::vector<double> &max_bound, const std::vector<bool> &wrapping, std::unique_ptr<StateToGeometry> state_to_geometry, std::unique_ptr<PointsToPath> points_to_path, const SafetySettings &safety_settings) : min_bound(min_bound), max_bound(max_bound), wrapping(wrapping), state_to_geometry(std::move(state_to_geometry)), points_to_path(std::move(points_to_path)), safety_settings(safety_settings) {
         if (min_bound.size() != max_bound.size() || min_bound.size() != wrapping.size()) throw std::invalid_argument("Size Mismatch (System)");
-        if (!state_to_geometry || !points_to_path) throw std::invalid_argument("System was initialised with a nullptr");
     }
 
 
@@ -621,9 +623,8 @@ private:
 
 class RRT {
 public:
-    RRT(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, SamplingStrategy* sampling, DistanceStrategy* distance_strategy) : system(system), end_point(end), max_extend(max_extend), sampling(sampling), distance(distance_strategy) {
+    RRT(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, std::unique_ptr<SamplingStrategy> sampling, std::unique_ptr<DistanceStrategy> distance_strategy) : system(system), end_point(end), max_extend(max_extend), sampling(std::move(sampling)), distance(std::move(distance_strategy)) {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (RRT)");
-        if (!sampling || !distance_strategy) throw std::invalid_argument("Sampling or Distance Strategy missing (RRT)");
         points.push_back(start);
         parent_index.push_back(root_index);
     }
@@ -631,7 +632,7 @@ public:
     [[nodiscard]] bool endFound() const {
         return end_found;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree() const {
         return points;
     }
     [[nodiscard]] std::vector<std::vector<double>> getPath() const {
@@ -645,10 +646,10 @@ public:
         std::reverse(path.begin(), path.end());
         return path;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes() const {
         return parent_index;
     }
-    [[nodiscard]] std::vector<double> getEndPoint() const {
+    [[nodiscard]] const std::vector<double> &getEndPoint() const {
         return end_point;
     }
 
@@ -717,9 +718,8 @@ private:
 
 class RRT_Star {
 public:
-    RRT_Star(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, SamplingStrategy* sampling, DistanceStrategy* distance_strategy, CostFunction* cost) : system(system), end_point(end), max_extend(max_extend), sampling(sampling), distance(distance_strategy), cost(cost) {
+    RRT_Star(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, std::unique_ptr<SamplingStrategy> sampling, std::unique_ptr<DistanceStrategy> distance_strategy, std::unique_ptr<CostFunction> cost) : system(system), end_point(end), max_extend(max_extend), sampling(std::move(sampling)), distance(std::move(distance_strategy)), cost(std::move(cost)) {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (RRT*)");
-        if (!sampling || !distance_strategy || !cost) throw std::invalid_argument("Sampling, Distance or Cost Strategy missing (RRT*)");
         points.push_back(start);
         parent_index.push_back(root_index);
         costs.push_back(0);
@@ -729,7 +729,7 @@ public:
     [[nodiscard]] bool endFound() const {
         return end_found_index != root_index;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree() const {
         return points;
     }
     [[nodiscard]] std::vector<std::vector<double>> getPath() const {
@@ -754,13 +754,13 @@ public:
         std::reverse(path_costs.begin(), path_costs.end());
         return path_costs;
     }
-    [[nodiscard]] std::vector<double> getCosts() const {
+    [[nodiscard]] const std::vector<double> &getCosts() const {
         return costs;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes() const {
         return parent_index;
     }
-    [[nodiscard]] std::vector<double> getEndPoint() const {
+    [[nodiscard]] const std::vector<double> &getEndPoint() const {
         return end_point;
     }
 
@@ -902,9 +902,8 @@ private:
 
 class Bi_RRT {
 public:
-    Bi_RRT(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, SamplingStrategy* sampling, DistanceStrategy* distance_strategy) : system(system), max_extend(max_extend), sampling(sampling), distance(distance_strategy) {
+    Bi_RRT(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, std::unique_ptr<SamplingStrategy> sampling, std::unique_ptr<DistanceStrategy> distance_strategy) : system(system), max_extend(max_extend), sampling(std::move(sampling)), distance(std::move(distance_strategy)) {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (BI_RRT)");
-        if (!sampling || !distance_strategy) throw std::invalid_argument("Sampling or Distance Strategy missing (BI_RRT)");
         points1.push_back(start);
         parent_index1.push_back(root_index);
         points2.push_back(end);
@@ -914,10 +913,10 @@ public:
     [[nodiscard]] bool endFound() const {
         return start_link != root_index;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree1() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree1() const {
         return points1;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree2() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree2() const {
         return points2;
     }
     [[nodiscard]] std::vector<std::vector<double>> getPath() const {
@@ -939,10 +938,10 @@ public:
 
         return path;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes1() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes1() const {
         return parent_index1;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes2() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes2() const {
         return parent_index2;
     }
     [[nodiscard]] unsigned int getStartLink() const {
@@ -978,14 +977,14 @@ public:
                 if (system.validSegment(points1[closest_other_index], new_point)) {
                     if (distance->getDistance(points1[closest_other_index], new_point, system.getWrapping()) < max_extend) {
                         start_link = closest_other_index;
-                        end_link = closest_index;
+                        end_link = points2.size() - 1;
                     }
                 }
             }
             else {
                 if (system.validSegment(new_point, points2[closest_other_index])) {
                     if (distance->getDistance(new_point, points2[closest_other_index], system.getWrapping()) < max_extend) {
-                        start_link = closest_index;
+                        start_link = points1.size() - 1;
                         end_link = closest_other_index;
                     }
                 }
@@ -1048,9 +1047,8 @@ private:
 
 class RRT_Connect {
 public:
-    RRT_Connect(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, SamplingStrategy* sampling, DistanceStrategy* distance_strategy) : system(system), max_extend(max_extend), sampling(sampling), distance(distance_strategy) {
+    RRT_Connect(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, std::unique_ptr<SamplingStrategy> sampling, std::unique_ptr<DistanceStrategy> distance_strategy) : system(system), max_extend(max_extend), sampling(std::move(sampling)), distance(std::move(distance_strategy)) {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (RRT_Connect)");
-        if (!sampling || !distance_strategy) throw std::invalid_argument("Sampling or Distance Strategy missing (RRT_Connect)");
         points1.push_back(start);
         parent_index1.push_back(root_index);
         points2.push_back(end);
@@ -1060,10 +1058,10 @@ public:
     [[nodiscard]] bool endFound() const {
         return start_link != root_index;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree1() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree1() const {
         return points1;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree2() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree2() const {
         return points2;
     }
     [[nodiscard]] std::vector<std::vector<double>> getPath() const {
@@ -1085,10 +1083,10 @@ public:
 
         return path;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes1() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes1() const {
         return parent_index1;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes2() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes2() const {
         return parent_index2;
     }
     [[nodiscard]] unsigned int getStartLink() const {
@@ -1201,9 +1199,8 @@ private:
 
 class Informed_RRT_Star {
 public:
-    Informed_RRT_Star(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, SamplingStrategy* sampling, DistanceStrategy* distance_strategy, CostFunction* cost) : system(system), end_point(end), max_extend(max_extend), sampling(sampling), distance(distance_strategy), cost(cost) {
+    Informed_RRT_Star(System &system, const std::vector<double> &start, const std::vector<double> &end, const double max_extend, std::unique_ptr<SamplingStrategy> sampling, std::unique_ptr<DistanceStrategy> distance_strategy, std::unique_ptr<CostFunction> cost) : system(system), end_point(end), max_extend(max_extend), sampling(std::move(sampling)), distance(std::move(distance_strategy)), cost(std::move(cost)) {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (Informed RRT*)");
-        if (!sampling || !distance_strategy || !cost) throw std::invalid_argument("Sampling, Distance or Cost Strategy missing (Informed RRT*)");
         points.push_back(start);
         parent_index.push_back(root_index);
         costs.push_back(0);
@@ -1260,7 +1257,7 @@ public:
     [[nodiscard]] bool endFound() const {
         return end_found_index != root_index;
     }
-    [[nodiscard]] std::vector<std::vector<double>> getTree() const {
+    [[nodiscard]] const std::vector<std::vector<double>> &getTree() const {
         return points;
     }
     [[nodiscard]] std::vector<std::vector<double>> getPath() const {
@@ -1285,13 +1282,13 @@ public:
         std::reverse(path_costs.begin(), path_costs.end());
         return path_costs;
     }
-    [[nodiscard]] std::vector<double> getCosts() const {
+    [[nodiscard]] const std::vector<double> &getCosts() const {
         return costs;
     }
-    [[nodiscard]] std::vector<unsigned int> getParentIndexes() const {
+    [[nodiscard]] const std::vector<unsigned int> &getParentIndexes() const {
         return parent_index;
     }
-    [[nodiscard]] std::vector<double> getEndPoint() const {
+    [[nodiscard]] const std::vector<double> &getEndPoint() const {
         return end_point;
     }
 

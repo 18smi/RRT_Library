@@ -4,22 +4,22 @@
 #include "Path_Refinement.h"
 
 
+
 int main() {
     sf::RenderWindow window(sf::VideoMode({500, 500}), "RRT display");//, sf::Style::Fullscreen
 
-    System sys({0, 0, 0}, {std::numbers::pi, 2*std::numbers::pi, 2*std::numbers::pi}, {true, false, true}, std::make_unique<Simple3JointArm>(30, 20, 2), std::make_unique<LinearPath>(), {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
+    System sys({0, 0, -0.9*std::numbers::pi}, {std::numbers::pi, 2*std::numbers::pi, 0.9*std::numbers::pi}, {false, false, false}, new Simple3JointArm(30, 20, 2), new LinearPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
     //sys.addConstraint
 
-    std::vector<double> start_position {0, 20, 30};
-    std::vector<double> end_position {30, 20, 30};
 
-    RRT alg(sys, Simple3JointArm::PositionToPoint(start_position), Simple3JointArm::PositionToPoint(end_position), (1.0/90)*std::numbers::pi, std::make_unique<BiasedSampling>(Simple3JointArm::PositionToPoint(end_position), 0.01) , std::make_unique<WeightedEuclidianDistance>(std::vector<double>{1, 2, 2}));
+
+    RRT alg(sys, {0, 0.5*std::numbers::pi, 1.5*std::numbers::pi}, {0.5*std::numbers::pi, 0.2*std::numbers::pi, 1.8*std::numbers::pi}, (1.0/90)*std::numbers::pi, new StochasticSampling, new WeightedEuclidianDistance({1, 2, 2}));
     RRT_Visualiser vis(window, sys);
 
     vis.setGeometricBounds({-50, -50, 0}, {50, 50, 50});
 
 
-    Simple3JointArmPositionFromPoint position_from_point(30, 20);
+    Simple3JointArmEffector position_from_point(30, 20);
     sf::Clock clock;
     while (window.isOpen()) {
         while (std::optional<sf::Event> event = window.pollEvent()) {

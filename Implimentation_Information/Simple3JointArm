@@ -11,6 +11,10 @@ the 3 independently actuated rotary joints consist of:
 these 3 joints give end effector access to 3 dimensional space
 
 
+Simple3JointArm::PositionToPoint(position) is a helper function Simple3JointArm offers to help converting start and end position
+into points (state space needed for the planner). due to how the model is constructed most of the time one position has two potential
+points it maps to so be aware that the helper makes an educated guess on which point you are intending on starting and ending at
+
 
 this model uses radians and capsule links
 

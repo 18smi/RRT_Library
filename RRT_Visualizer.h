@@ -156,9 +156,9 @@ public:
         return position;
     }
 };
-class Simple3JointArmEffector final : public PositionFromPoint {
+class Simple3JointArmPositionFromPoint final : public PositionFromPoint {
 public:
-    Simple3JointArmEffector(const double length1, const double length2) : length1(length1), length2(length2) {}
+    Simple3JointArmPositionFromPoint(const double length1, const double length2) : length1(length1), length2(length2) {}
 
     [[nodiscard]] std::array<double, 3> getPosition(const std::vector<double> &point) const override {
         const double joint2_xy = cos(point[1])*length1 + cos(point[2] + point[1])*length2;
@@ -270,30 +270,47 @@ public:
 
 
         //dots and lines
-        sf::CircleShape tree_dot(dot_radius);
-        tree_dot.setOrigin({dot_radius, dot_radius});
-        tree_dot.setFillColor(sf::Color::Red);
+        sf::VertexArray dot_vertices(sf::PrimitiveType::Triangles, dots.size() * 36);//12 triangles per circle
+        sf::VertexArray lines(sf::PrimitiveType::Lines, (dots.size() - 1) * connection_steps * 2);
+        float angle_step = std::numbers::pi / 6;
+        unsigned int vertex_index = 0;
+        for (unsigned int i = 0; i < dots.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                dot_vertices[vertex_index] = sf::Vertex{center, sf::Color::Red};
+                dot_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Red};
+                dot_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Red};
+                vertex_index += 3;
+            }
+        }
+        vertex_index = 0;
         for (unsigned int i = 1; i < dots.size(); i++) {
             for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
+                std::vector<double> line_start = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j) / connection_steps);
+                std::vector<double> line_end   = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j + 1) / connection_steps);
+
+                lines[vertex_index] = sf::Vertex{sf::Vector2f {static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f {static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
             }
-            tree_dot.setPosition({static_cast<float>(dots[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
         }
+        window.draw(dot_vertices);
+        window.draw(lines);
+
 
         //path
-        sf::CircleShape path_dot(dot_radius*1.5f);
-        path_dot.setOrigin({dot_radius*1.5f, dot_radius*1.5f});
-        path_dot.setFillColor(sf::Color::White);
-        for (const std::vector<double>& i : path) {
-            path_dot.setPosition({static_cast<float>(i[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(i[y_index] - min[y_index]) * scale_y});
-            window.draw(path_dot);
+        sf::VertexArray path_vertices(sf::PrimitiveType::Triangles, path.size() * 36);//12 triangles per circle
+        vertex_index = 0;
+        for (unsigned int i = 0; i < path.size(); i++) {
+            sf::Vector2f center {static_cast<float>(path[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(path[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                path_vertices[vertex_index] = sf::Vertex{center, sf::Color::White};
+                path_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius * 1.5f, std::sin(j * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                path_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius * 1.5f, std::sin((j + 1) * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                vertex_index += 3;
+            }
         }
+        window.draw(path_vertices);
 
         window.display();
     }
@@ -484,36 +501,61 @@ public:
         window.draw(start_end);
 
 
+
         //dots and lines
-        sf::CircleShape tree_dot(dot_radius);
-        tree_dot.setOrigin({dot_radius, dot_radius});
-        tree_dot.setFillColor(sf::Color::Red);
+        sf::VertexArray dot_vertices(sf::PrimitiveType::Triangles, dots.size() * 36);//12 triangles per circle
+        sf::VertexArray lines(sf::PrimitiveType::Lines, (dots.size() - 1) * connection_steps * 2);
+        float angle_step = std::numbers::pi / 6;
+        unsigned int vertex_index = 0;
+        for (unsigned int i = 0; i < dots.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                dot_vertices[vertex_index] = sf::Vertex{center, sf::Color::Red};
+                dot_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Red};
+                dot_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Red};
+                vertex_index += 3;
+            }
+        }
+        vertex_index = 0;
         for (unsigned int i = 1; i < dots.size(); i++) {
             for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j + 1)/connection_steps);
-                unsigned char start_red_cost = static_cast<unsigned char>((red_cost[i] - red_cost[parentIndexes[i]])*(static_cast<double>(j)/connection_steps) + red_cost[parentIndexes[i]]);
-                unsigned char end_red_cost = static_cast<unsigned char>((red_cost[i] - red_cost[parentIndexes[i]])*(static_cast<double>(j+1)/connection_steps) + red_cost[parentIndexes[i]]);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                line[0].color = sf::Color(start_red_cost, 255 - start_red_cost, 0);
-                line[1].color = sf::Color(end_red_cost, 255 - end_red_cost, 0);
-                window.draw(line);
+                double t_start = static_cast<double>(j) / connection_steps;
+                double t_end = static_cast<double>(j + 1) / connection_steps;
+
+                std::vector<double> line_start = points_to_path->sample(dots[parentIndexes[i]], dots[i], t_start);
+                std::vector<double> line_end   = points_to_path->sample(dots[parentIndexes[i]], dots[i], t_end);
+
+                auto start_red = static_cast<std::uint8_t>((red_cost[i] - red_cost[parentIndexes[i]]) * t_start + red_cost[parentIndexes[i]]);
+                auto end_red   = static_cast<std::uint8_t>((red_cost[i] - red_cost[parentIndexes[i]]) * t_end   + red_cost[parentIndexes[i]]);
+
+                sf::Color start_color{start_red, static_cast<std::uint8_t>(255 - start_red), 0};
+                sf::Color end_color{end_red, static_cast<std::uint8_t>(255 - end_red), 0};
+
+                sf::Vector2f start_pos{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)};
+                sf::Vector2f end_pos{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)};
+
+                lines[vertex_index] = sf::Vertex{start_pos, start_color};
+                lines[vertex_index+1] = sf::Vertex{end_pos, end_color};
+                vertex_index += 2;
             }
-            tree_dot.setPosition({static_cast<float>(dots[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
         }
+        window.draw(dot_vertices);
+        window.draw(lines);
 
 
         //path
-        sf::CircleShape path_dot(dot_radius*1.5f);
-        path_dot.setOrigin({dot_radius*1.5f, dot_radius*1.5f});
-        path_dot.setFillColor(sf::Color::White);
-        for (const std::vector<double>& i : path) {
-            path_dot.setPosition({static_cast<float>(i[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(i[y_index] - min[y_index]) * scale_y});
-            window.draw(path_dot);
+        sf::VertexArray path_vertices(sf::PrimitiveType::Triangles, path.size() * 36);//12 triangles per circle
+        vertex_index = 0;
+        for (unsigned int i = 0; i < path.size(); i++) {
+            sf::Vector2f center {static_cast<float>(path[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(path[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                path_vertices[vertex_index] = sf::Vertex{center, sf::Color::White};
+                path_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius * 1.5f, std::sin(j * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                path_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius * 1.5f, std::sin((j + 1) * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                vertex_index += 3;
+            }
         }
+        window.draw(path_vertices);
 
 
         window.display();
@@ -537,6 +579,7 @@ public:
         const std::vector<unsigned int> parentIndexes1 = tree.getParentIndexes1();
         const std::vector<unsigned int> parentIndexes2 = tree.getParentIndexes2();
         const std::vector<std::vector<double>> path = tree.getPath();
+        const std::vector<const Constraint*> constraints = system.getConstraints();
 
 
         //draw constraints
@@ -555,36 +598,6 @@ public:
         screen_view.setCenter({static_cast<float>(window.getSize().x) / 2.f,static_cast<float>(window.getSize().y) / 2.f});
         window.setView(screen_view);
 
-        //dots and lines
-        sf::CircleShape tree_dot(dot_radius);
-        tree_dot.setOrigin({dot_radius, dot_radius});
-        tree_dot.setFillColor(sf::Color::Red);
-        for (unsigned int i = 1; i < dots1.size(); i++) {
-            for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
-            }
-            tree_dot.setPosition({static_cast<float>(dots1[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots1[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
-        }
-        tree_dot.setFillColor(sf::Color::Blue);
-        for (unsigned int i = 1; i < dots2.size(); i++) {
-            for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots2[i], dots2[parentIndexes2[i]], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots2[i], dots2[parentIndexes2[i]], static_cast<double>(j + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
-            }
-            tree_dot.setPosition({static_cast<float>(dots2[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots2[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
-        }
-
 
         //draw start and end
         sf::CircleShape start_end(dot_radius*2);
@@ -597,27 +610,84 @@ public:
         window.draw(start_end);
 
 
-        //path
-        sf::CircleShape path_dot(dot_radius*1.5f);
-        path_dot.setOrigin({dot_radius*1.5f, dot_radius*1.5f});
-        path_dot.setFillColor(sf::Color::White);
-        for (const std::vector<double>& i : path) {
-            path_dot.setPosition({static_cast<float>(i[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(i[y_index] - min[y_index]) * scale_y});
-            window.draw(path_dot);
+        //dots and lines
+        sf::VertexArray dot1_vertices(sf::PrimitiveType::Triangles, dots1.size() * 36);//12 triangles per circle
+        sf::VertexArray dot2_vertices(sf::PrimitiveType::Triangles, dots2.size() * 36);
+        sf::VertexArray lines(sf::PrimitiveType::Lines, (dots1.size() + dots2.size() - (tree.endFound()? 1 : 2)) * connection_steps * 2);
+        unsigned int vertex_index = 0;
+        float angle_step = std::numbers::pi / 6;
+        for (unsigned int i = 0; i < dots1.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots1[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots1[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                dot1_vertices[vertex_index] = sf::Vertex{center, sf::Color::Red};
+                dot1_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Red};
+                dot1_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Red};
+                vertex_index += 3;
+            }
         }
+        vertex_index = 0;
+        for (unsigned int i = 0; i < dots2.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots2[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots2[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                dot2_vertices[vertex_index] = sf::Vertex{center, sf::Color::Blue};
+                dot2_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Blue};
+                dot2_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Blue};
+                vertex_index += 3;
+            }
+        }
+        vertex_index = 0;
+        for (unsigned int i = 1; i < dots1.size(); i++) {
+            for (unsigned int j = 0; j < connection_steps; j++) {
+                std::vector<double> line_start = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j) / connection_steps);
+                std::vector<double> line_end   = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j + 1) / connection_steps);
 
+                lines[vertex_index] = sf::Vertex{sf::Vector2f{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
+            }
+        }
+        for (unsigned int i = 1; i < dots2.size(); i++) {
+            for (unsigned int j = 0; j < connection_steps; j++) {
+                std::vector<double> line_start = points_to_path->sample(dots2[parentIndexes2[i]], dots2[i], static_cast<double>(j) / connection_steps);
+                std::vector<double> line_end   = points_to_path->sample(dots2[parentIndexes2[i]], dots2[i], static_cast<double>(j + 1) / connection_steps);
 
+                lines[vertex_index] = sf::Vertex{sf::Vector2f{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
+            }
+        }
         //linking the trees
         if (tree.endFound()) {
             for (unsigned int i = 0; i < connection_steps; i++) {
                 std::vector<double> line_start = points_to_path->sample(dots1[tree.getStartLink()], dots2[tree.getEndLink()], static_cast<double>(i)/connection_steps);
                 std::vector<double> line_end = points_to_path->sample(dots1[tree.getStartLink()], dots2[tree.getEndLink()], static_cast<double>(i + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
+
+                lines[vertex_index] = sf::Vertex{sf::Vector2f{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
             }
         }
+        window.draw(dot1_vertices);
+        window.draw(dot2_vertices);
+        window.draw(lines);
+
+
+        //path
+        sf::VertexArray path_vertices(sf::PrimitiveType::Triangles, path.size() * 36);//12 triangles per circle
+        vertex_index = 0;
+        for (unsigned int i = 0; i < path.size(); i++) {
+            sf::Vector2f center {static_cast<float>(path[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(path[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                path_vertices[vertex_index] = sf::Vertex{center, sf::Color::White};
+                path_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius * 1.5f, std::sin(j * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                path_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius * 1.5f, std::sin((j + 1) * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                vertex_index += 3;
+            }
+        }
+        window.draw(path_vertices);
+
+
+
 
         window.display();
     }
@@ -659,36 +729,6 @@ public:
         screen_view.setCenter({static_cast<float>(window.getSize().x) / 2.f,static_cast<float>(window.getSize().y) / 2.f});
         window.setView(screen_view);
 
-        //dots and lines
-        sf::CircleShape tree_dot(dot_radius);
-        tree_dot.setOrigin({dot_radius, dot_radius});
-        tree_dot.setFillColor(sf::Color::Red);
-        for (unsigned int i = 1; i < dots1.size(); i++) {
-            for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
-            }
-            tree_dot.setPosition({static_cast<float>(dots1[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots1[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
-        }
-        tree_dot.setFillColor(sf::Color::Blue);
-        for (unsigned int i = 1; i < dots2.size(); i++) {
-            for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots2[i], dots2[parentIndexes2[i]], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots2[i], dots2[parentIndexes2[i]], static_cast<double>(j + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
-            }
-            tree_dot.setPosition({static_cast<float>(dots2[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots2[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
-        }
-
 
         //draw start and end
         sf::CircleShape start_end(dot_radius*2);
@@ -701,27 +741,84 @@ public:
         window.draw(start_end);
 
 
-        //path
-        sf::CircleShape path_dot(dot_radius*1.5f);
-        path_dot.setOrigin({dot_radius*1.5f, dot_radius*1.5f});
-        path_dot.setFillColor(sf::Color::White);
-        for (const std::vector<double>& i : path) {
-            path_dot.setPosition({static_cast<float>(i[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(i[y_index] - min[y_index]) * scale_y});
-            window.draw(path_dot);
+        //dots and lines
+        sf::VertexArray dot1_vertices(sf::PrimitiveType::Triangles, dots1.size() * 36);//12 triangles per circle
+        sf::VertexArray dot2_vertices(sf::PrimitiveType::Triangles, dots2.size() * 36);
+        sf::VertexArray lines(sf::PrimitiveType::Lines, (dots1.size() + dots2.size() - (tree.endFound()? 1 : 2)) * connection_steps * 2);
+        unsigned int vertex_index = 0;
+        float angle_step = std::numbers::pi / 6;
+        for (unsigned int i = 0; i < dots1.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots1[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots1[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                dot1_vertices[vertex_index] = sf::Vertex{center, sf::Color::Red};
+                dot1_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Red};
+                dot1_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Red};
+                vertex_index += 3;
+            }
         }
+        vertex_index = 0;
+        for (unsigned int i = 0; i < dots2.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots2[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots2[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                dot2_vertices[vertex_index] = sf::Vertex{center, sf::Color::Blue};
+                dot2_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Blue};
+                dot2_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Blue};
+                vertex_index += 3;
+            }
+        }
+        vertex_index = 0;
+        for (unsigned int i = 1; i < dots1.size(); i++) {
+            for (unsigned int j = 0; j < connection_steps; j++) {
+                std::vector<double> line_start = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j) / connection_steps);
+                std::vector<double> line_end   = points_to_path->sample(dots1[parentIndexes1[i]], dots1[i], static_cast<double>(j + 1) / connection_steps);
 
+                lines[vertex_index] = sf::Vertex{sf::Vector2f{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
+            }
+        }
+        for (unsigned int i = 1; i < dots2.size(); i++) {
+            for (unsigned int j = 0; j < connection_steps; j++) {
+                std::vector<double> line_start = points_to_path->sample(dots2[parentIndexes2[i]], dots2[i], static_cast<double>(j) / connection_steps);
+                std::vector<double> line_end   = points_to_path->sample(dots2[parentIndexes2[i]], dots2[i], static_cast<double>(j + 1) / connection_steps);
 
+                lines[vertex_index] = sf::Vertex{sf::Vector2f{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
+            }
+        }
         //linking the trees
         if (tree.endFound()) {
             for (unsigned int i = 0; i < connection_steps; i++) {
                 std::vector<double> line_start = points_to_path->sample(dots1[tree.getStartLink()], dots2[tree.getEndLink()], static_cast<double>(i)/connection_steps);
                 std::vector<double> line_end = points_to_path->sample(dots1[tree.getStartLink()], dots2[tree.getEndLink()], static_cast<double>(i + 1)/connection_steps);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                window.draw(line);
+
+                lines[vertex_index] = sf::Vertex{sf::Vector2f{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)}};
+                lines[vertex_index+1] = sf::Vertex{sf::Vector2f{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)}};
+                vertex_index += 2;
             }
         }
+        window.draw(dot1_vertices);
+        window.draw(dot2_vertices);
+        window.draw(lines);
+
+
+        //path
+        sf::VertexArray path_vertices(sf::PrimitiveType::Triangles, path.size() * 36);//12 triangles per circle
+        vertex_index = 0;
+        for (unsigned int i = 0; i < path.size(); i++) {
+            sf::Vector2f center {static_cast<float>(path[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(path[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                path_vertices[vertex_index] = sf::Vertex{center, sf::Color::White};
+                path_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius * 1.5f, std::sin(j * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                path_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius * 1.5f, std::sin((j + 1) * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                vertex_index += 3;
+            }
+        }
+        window.draw(path_vertices);
+
+
+
 
         window.display();
     }
@@ -780,36 +877,61 @@ public:
         window.draw(start_end);
 
 
+
         //dots and lines
-        sf::CircleShape tree_dot(dot_radius);
-        tree_dot.setOrigin({dot_radius, dot_radius});
-        tree_dot.setFillColor(sf::Color::Red);
+        sf::VertexArray vertices(sf::PrimitiveType::Triangles, dots.size() * 36);//12 triangles per circle
+        sf::VertexArray lines(sf::PrimitiveType::Lines, (dots.size() - 1) * connection_steps * 2);
+        float angle_step = std::numbers::pi / 6;
+        unsigned int vertex_index = 0;
+        for (unsigned int i = 0; i < dots.size(); i++) {
+            sf::Vector2f center {static_cast<float>(dots[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                vertices[vertex_index] = sf::Vertex{center, sf::Color::Red};
+                vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius, std::sin(j * angle_step) * dot_radius}, sf::Color::Red};
+                vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius, std::sin((j + 1) * angle_step) * dot_radius}, sf::Color::Red};
+                vertex_index += 3;
+            }
+        }
+        vertex_index = 0;
         for (unsigned int i = 1; i < dots.size(); i++) {
             for (unsigned int j = 0; j < connection_steps; j++) {
-                std::vector<double> line_start = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j)/connection_steps);
-                std::vector<double> line_end = points_to_path->sample(dots[parentIndexes[i]], dots[i], static_cast<double>(j + 1)/connection_steps);
-                unsigned char start_red_cost = static_cast<unsigned char>((red_cost[i] - red_cost[parentIndexes[i]])*(static_cast<double>(j)/connection_steps) + red_cost[parentIndexes[i]]);
-                unsigned char end_red_cost = static_cast<unsigned char>((red_cost[i] - red_cost[parentIndexes[i]])*(static_cast<double>(j+1)/connection_steps) + red_cost[parentIndexes[i]]);
-                sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-                line[0].position = sf::Vector2f(static_cast<float>(line_start[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_start[y_index] - min[y_index])*scale_y);
-                line[1].position = sf::Vector2f(static_cast<float>(line_end[x_index] - min[x_index])*scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(line_end[y_index] - min[y_index])*scale_y);
-                line[0].color = sf::Color(start_red_cost, 255 - start_red_cost, 0);
-                line[1].color = sf::Color(end_red_cost, 255 - end_red_cost, 0);
-                window.draw(line);
+                double t_start = static_cast<double>(j) / connection_steps;
+                double t_end   = static_cast<double>(j + 1) / connection_steps;
+
+                std::vector<double> line_start = points_to_path->sample(dots[parentIndexes[i]], dots[i], t_start);
+                std::vector<double> line_end   = points_to_path->sample(dots[parentIndexes[i]], dots[i], t_end);
+
+                auto start_red = static_cast<std::uint8_t>((red_cost[i] - red_cost[parentIndexes[i]]) * t_start + red_cost[parentIndexes[i]]);
+                auto end_red   = static_cast<std::uint8_t>((red_cost[i] - red_cost[parentIndexes[i]]) * t_end   + red_cost[parentIndexes[i]]);
+
+                sf::Color start_color{start_red, static_cast<std::uint8_t>(255 - start_red), 0};
+                sf::Color end_color{end_red, static_cast<std::uint8_t>(255 - end_red), 0};
+
+                sf::Vector2f start_pos{static_cast<float>(line_start[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_start[y_index] - min[y_index]) * scale_y)};
+                sf::Vector2f end_pos{static_cast<float>(line_end[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y - (line_end[y_index] - min[y_index]) * scale_y)};
+
+                lines[vertex_index] = sf::Vertex{start_pos, start_color};
+                lines[vertex_index+1] = sf::Vertex{end_pos, end_color};
+                vertex_index += 2;
             }
-            tree_dot.setPosition({static_cast<float>(dots[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(dots[i][y_index] - min[y_index]) * scale_y});
-            window.draw(tree_dot);
         }
+        window.draw(vertices);
+        window.draw(lines);
 
 
         //path
-        sf::CircleShape path_dot(dot_radius*1.5f);
-        path_dot.setOrigin({dot_radius*1.5f, dot_radius*1.5f});
-        path_dot.setFillColor(sf::Color::White);
-        for (const std::vector<double>& i : path) {
-            path_dot.setPosition({static_cast<float>(i[x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(i[y_index] - min[y_index]) * scale_y});
-            window.draw(path_dot);
+        sf::VertexArray path_vertices(sf::PrimitiveType::Triangles, path.size() * 36);//12 triangles per circle
+        vertex_index = 0;
+        for (unsigned int i = 0; i < path.size(); i++) {
+            sf::Vector2f center {static_cast<float>(path[i][x_index] - min[x_index]) * scale_x, static_cast<float>(window.getSize().y) - static_cast<float>(path[i][y_index] - min[y_index]) * scale_y};
+            for (short j = 0; j < 12; j++) {
+                path_vertices[vertex_index] = sf::Vertex{center, sf::Color::White};
+                path_vertices[vertex_index+1] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j) * angle_step) * dot_radius * 1.5f, std::sin(j * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                path_vertices[vertex_index+2] = sf::Vertex{center + sf::Vector2f{std::cos(static_cast<float>(j + 1) * angle_step) * dot_radius * 1.5f, std::sin((j + 1) * angle_step) * dot_radius * 1.5f}, sf::Color::White};
+                vertex_index += 3;
+            }
         }
+        window.draw(path_vertices);
 
 
         window.display();
