@@ -1,1 +1,3 @@
 drawing uses a simplified view
+
+when creating your own drawable constrains the windows viewpoint is set up to convert world position into window position

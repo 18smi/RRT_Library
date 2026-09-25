@@ -1,0 +1,74 @@
+/*
+This is a basic example of each of the RRT Variants
+
+
+*/
+
+#include "RRT.h"
+#include "RRT_Visualizer.h"
+#include "Path_Refinement.h"
+
+
+int main() {
+    sf::RenderWindow window(sf::VideoMode({1000, 500}), "RRT display");
+
+    System sys({0, 0}, {100, 100}, {false, false}, new PointGeometry, new LinearPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 20}, {32, 95})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 97}, {32, 100})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 0}, {62, 10})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 20}, {62, 70})));
+    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperSphere(10, {85, 35})));
+
+
+    RRT alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
+    //RRT_Star alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance, new DistanceCost(new EuclidianDistance, {false, false}));
+    //Bi_RRT alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
+    //RRT_Connect alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
+    //Informed_RRT_Star alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance, new DistanceCost(new EuclidianDistance, {false, false}));
+    RRT_Visualiser vis(window, sys);
+
+
+
+    sf::Clock clock;
+    while (window.isOpen()) {
+        while (std::optional<sf::Event> event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+            }
+            if (auto key = event->getIf<sf::Event::KeyPressed>()) {
+                if (key->code == sf::Keyboard::Key::Escape) {
+                    window.close();
+                }
+            }
+        }
+
+
+        if (clock.getElapsedTime().asMilliseconds() > 10) {
+            alg.step();
+            vis.drawFlat();
+            clock.restart();
+        }
+    }
+
+    std::vector<std::vector<double>> path = alg.getPath();
+    for (auto & i : path) {
+        std::cout << "(" << i[0];
+        for (int j = 1; j < i.size(); j++) {
+            std::cout << ", " << i[j];
+        }
+        std::cout << ")\n";
+    }
+
+
+    std::cout << "\n\nSmoothed Path\n";
+    const std::vector<std::vector<double>> smoothed = refine::greedyShortcutting(path, sys);
+    for (auto & i : smoothed) {
+        std::cout << "(" << i[0];
+        for (int j = 1; j < i.size(); j++) {
+            std::cout << ", " << i[j];
+        }
+        std::cout << ")\n";
+    }
+
+    return 0;
+}

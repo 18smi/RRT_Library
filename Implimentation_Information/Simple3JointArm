@@ -1,6 +1,8 @@
 Simple3JointArm is a StateToGeometry child that is designed for a robotic arm with three
 independently actuated rotary joints connected by two fixed size links (conventional yaw-pitch-pitch arm)
 
+Simple3JointArmEffector is designed for the visualizing of this model in 3 dimensions
+
 the 3 independently actuated rotary joints consist of:
     1. Rotation around the central vertical axis (base)
     2. Controls the angle between the first link and the base (shoulder)

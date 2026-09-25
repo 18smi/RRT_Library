@@ -101,6 +101,16 @@ public:
         return current;
     }
 };
+class MaximumAxisDistance final : public DistanceStrategy {
+public:
+    [[nodiscard]] double getDistance(const std::vector<double> &start, const std::vector<double> &end, const std::vector<bool> &wrapping) const override {
+        double current_max = std::abs(start[0] - end[0]);
+        for (unsigned int i = 1; i < start.size(); i++) {
+            current_max = std::max(current_max, std::abs(start[i] - end[i]));
+        }
+        return current_max;
+    }
+};
 //more
 
 
@@ -248,7 +258,7 @@ public:
             z_min = std::min(joint_positions[i][2] - link_thickness, z_min);
             z_max = std::max(joint_positions[i][2] + link_thickness, z_max);
         }
-        return BoundingBox{x_min, x_max, y_min, y_max, z_min, z_max};
+        return BoundingBox{x_min, y_min, z_min, x_max, y_max, z_max};
     }
     [[nodiscard]] std::vector<Capsule> getCapsules(const std::vector<double> &point) const override {
         if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");

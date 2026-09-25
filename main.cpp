@@ -4,27 +4,22 @@
 #include "Path_Refinement.h"
 
 
+
 int main() {
-    sf::RenderWindow window(sf::VideoMode({1000, 500}), "RRT display");//, sf::Style::Fullscreen
+    sf::RenderWindow window(sf::VideoMode({500, 500}), "RRT display");//, sf::Style::Fullscreen
 
-    System sys({0, 0}, {100, 100}, {false, false}, new NoGeometry, new AxisSequentialPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
-    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 20}, {32, 95})));
-    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({30, 97}, {32, 100})));
-    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 0}, {62, 10})));
-    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperRectangle({60, 20}, {62, 70})));
-    sys.addConstraint(std::unique_ptr<Constraint>(new DrawableHyperSphere(10, {85, 35})));
+    System sys({0, 0, -0.9*std::numbers::pi}, {std::numbers::pi, 2*std::numbers::pi, 0.9*std::numbers::pi}, {false, false, false}, new Simple3JointArm(30, 20, 2), new LinearPath, {.constraint_safety_margin = 0, .obstacle_safety_margin = 2, .interpolation_steps = 10});
+    //sys.addConstraint
 
 
-    RRT alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
-    //RRT_Star alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new AdditiveDistance, new DistanceCost(new AdditiveDistance, {false, false}));
-    //Bi_RRT alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
-    //RRT_Connect alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance);
-    //Informed_RRT_Star alg(sys, {10, 90}, {90, 10}, 5, new StochasticSampling, new EuclidianDistance, new DistanceCost(new EuclidianDistance, {false, false}));
+
+    RRT alg(sys, {0, 0.5*std::numbers::pi, 1.5*std::numbers::pi}, {0.5*std::numbers::pi, 0.2*std::numbers::pi, 1.8*std::numbers::pi}, (1.0/90)*std::numbers::pi, new StochasticSampling, new WeightedEuclidianDistance({1, 2, 2}));
     RRT_Visualiser vis(window, sys);
 
-    vis.setGeometricBounds({0, 0, 0}, {100, 100, 0});
-    DirectPositionFromPoint position_from_point;
+    vis.setGeometricBounds({-50, -50, 0}, {50, 50, 50});
 
+
+    Simple3JointArmEffector position_from_point(30, 20);
     sf::Clock clock;
     while (window.isOpen()) {
         while (std::optional<sf::Event> event = window.pollEvent()) {
@@ -42,6 +37,7 @@ int main() {
 
         if (clock.getElapsedTime().asMilliseconds() > 10) {
             vis.camProjectDraw(alg, position_from_point, 0, 0, 0);
+            //vis.drawFlat(alg, 0, 1);
             alg.step();
             clock.restart();
         }

@@ -156,6 +156,22 @@ public:
         return position;
     }
 };
+class Simple3JointArmEffector final : public PositionFromPoint {
+public:
+    Simple3JointArmEffector(const double length1, const double length2) : length1(length1), length2(length2) {}
+
+    [[nodiscard]] std::array<double, 3> getPosition(const std::vector<double> &point) const override {
+        const double joint2_xy = cos(point[1])*length1 + cos(point[2] + point[1])*length2;
+        const double joint2_x = cos(point[0])*joint2_xy;
+        const double joint2_y = sin(point[0])*joint2_xy;
+        const double joint2_z = sin(point[1])*length1 + sin(point[2] + point[1])*length2;
+
+        return {joint2_x, joint2_y, joint2_z};
+    }
+private:
+    double length1;
+    double length2;
+};
 
 
 class RRT_Visualiser {
@@ -339,6 +355,7 @@ public:
             const double offset = xyz_min[2] == xyz_max[2] ? (dot_size_max - dot_size_min)/2 + dot_size_min : dot_size_min - (xyz_min[2]*(dot_size_max - dot_size_min)) / (xyz_max[2] - xyz_min[2]);
             const float scale_x = static_cast<float>(window.getSize().x) / static_cast<float>(xyz_max[0] - xyz_min[0]);
             const float scale_y = static_cast<float>(window.getSize().y) / static_cast<float>(xyz_max[1] - xyz_min[1]);
+            const float scale_xy = static_cast<float>(std::min(window.getSize().y, window.getSize().x)) / static_cast<float>(std::min(xyz_max[1] - xyz_min[1], xyz_max[0] - xyz_min[0]));
 
 
             const std::vector<std::vector<double>> dots = tree.getTree();
