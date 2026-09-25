@@ -26,6 +26,7 @@ note = adjustment radius for RRT* and Informed_RRT* are fixed as it seems to wor
 
 --------------- TO DO ---------------
 improve ownership clarity
+look continuous collision detection instead of desecrate (safer?)
 implement projectDraw
 implement obstacles
 implement sobol sampling

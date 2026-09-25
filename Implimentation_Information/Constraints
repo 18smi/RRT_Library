@@ -1,0 +1,2 @@
+constraints use line segment intersection
+the validConnection function takes two points which represent star and end of a straight line segment

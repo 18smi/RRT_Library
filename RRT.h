@@ -212,13 +212,13 @@ class StateToGeometry {
 public:
     virtual ~StateToGeometry() = default;
     [[nodiscard]] virtual BoundingBox getBoundingBox(const std::vector<double>&) const = 0;//axes aligned
-    [[nodiscard]] virtual Capsule getCapsule(const std::vector<double>&) const = 0;
+    [[nodiscard]] virtual std::vector<Capsule> getCapsules(const std::vector<double>&) const = 0;
     [[nodiscard]] virtual SDF getSDF(const std::vector<double>&) const = 0;
 };
 class NoGeometry final : public StateToGeometry {
 public:
     [[nodiscard]] BoundingBox getBoundingBox(const std::vector<double> &point) const override {return BoundingBox{0, 0, 0, 0, 0, 0};}
-    [[nodiscard]] Capsule getCapsule(const std::vector<double> &point) const override {return Capsule{{0, 0, 0}, {0, 0, 0}, 0};}
+    [[nodiscard]] std::vector<Capsule> getCapsules(const std::vector<double> &point) const override {return std::vector<Capsule>{};}
     [[nodiscard]] SDF getSDF(const std::vector<double> &point) const override {return SDF{};}
 };
 class Simple3JointArm final : public StateToGeometry {
@@ -250,9 +250,15 @@ public:
         }
         return BoundingBox{x_min, x_max, y_min, y_max, z_min, z_max};
     }
-    [[nodiscard]] Capsule getCapsule(const std::vector<double> &point) const override {
+    [[nodiscard]] std::vector<Capsule> getCapsules(const std::vector<double> &point) const override {
         if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
 
+        std::vector<Capsule> result;
+        std::array<std::array<double, 3>, 3> joint_positions = getJointPositions(point);
+        result.push_back(Capsule(joint_positions[0], joint_positions[1], link_thickness));
+        result.push_back(Capsule(joint_positions[1], joint_positions[2], link_thickness));
+
+        return result;
     }
     [[nodiscard]] SDF getSDF(const std::vector<double> &point) const override {
         if (point.size() != 3) throw std::invalid_argument("Point Size Must Equal 3 (Simple3JointArm)");
@@ -270,16 +276,15 @@ private:
         std::array<std::array<double, 3>, 3> result{};
 
         const double joint1_xy = cos(point[1])*length1;
-        const double joint2_xy = joint1_xy + cos(point[2])*length2;
+        const double joint2_xy = joint1_xy + cos(point[2] + point[1])*length2;
 
         const double joint1_x = cos(point[0])*joint1_xy;
         const double joint1_y = sin(point[0])*joint1_xy;
         const double joint1_z = sin(point[1])*length1;
 
-        //need to be edited to make 0 = aligned with point[1]
         const double joint2_x = cos(point[0])*joint2_xy;
         const double joint2_y = sin(point[0])*joint2_xy;
-        const double joint2_z = joint1_z + sin(point[2])*length2;
+        const double joint2_z = joint1_z + sin(point[2] + point[1])*length2;
 
         result[0] = {0, 0, 0};
         result[1] = {joint1_x, joint1_y, joint1_z};
@@ -550,14 +555,16 @@ public:
             }
         }
         const BoundingBox bounding_box = createBoundingBox(start, end);
-        std::optional<Capsule> capsule;
+        std::vector<Capsule> capsules;
         std::optional<SDF> sdf;
         for (const auto & obstacle : obstacles) {
             if (!obstacle->validBoundingBox(bounding_box, safety_settings.obstacle_safety_margin)) {
-                if (!capsule.has_value()) capsule = createCapsule(start, end);
-                if (!obstacle->validCapsule(capsule.value())) {
-                    if (!sdf.has_value()) sdf = createSDF(start, end);
-                    if (!obstacle->validSDF(sdf.value())) return false;
+                if (capsules.empty()) capsules = createCapsules(start, end);
+                for (const auto & capsule : capsules) {
+                    if (!obstacle->validCapsule(capsule)) {
+                        if (!sdf.has_value()) sdf = createSDF(start, end);
+                        if (!obstacle->validSDF(sdf.value())) return false;
+                    }
                 }
             }
         }
@@ -591,9 +598,9 @@ private:
         }
         return BoundingBox{min, max};
     }
-    [[nodiscard]] Capsule createCapsule(const std::vector<double> &start, const std::vector<double> &end) const {
+    [[nodiscard]] std::vector<Capsule> createCapsules(const std::vector<double> &start, const std::vector<double> &end) const {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (System::createCapsule)");
-        return Capsule{{0, 0, 0}, {0, 0, 0}, 0};
+        return std::vector<Capsule>{};
     }
     [[nodiscard]] SDF createSDF(const std::vector<double> &start, const std::vector<double> &end) const {
         if (start.size() != end.size()) throw std::invalid_argument("Size Mismatch (System::createSDF)");
