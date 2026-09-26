@@ -14,16 +14,14 @@ int main() {
     //workspace obstacles
 
     std::vector<double> start_point = Simple3JointArm::PositionToPoint(std::array<double, 3>{0, 20, 30}, 30, 20);
-    std::vector<double> end_point = Simple3JointArm::PositionToPoint(std::array<double, 3>{10, 0.5, -30}, 30, 20);
+    std::vector<double> end_point = Simple3JointArm::PositionToPoint(std::array<double, 3>{10, -40, 0.5}, 30, 20);
     for (unsigned int i = 0; i < 3; i++) {
-        start_point[i] *= 360 / std::numbers::pi;
-        end_point[i] *= 360 / std::numbers::pi;
-        start_point[i] = fmod(start_point[i] + 360,  360);
-        end_point[i] = fmod(end_point[i] + 360,  360);
+        start_point[i] *= 180 / std::numbers::pi;
+        end_point[i] *= 180 / std::numbers::pi;
         std::cout << start_point[i]  << ", " << end_point[i] << std::endl;
     }// converts radians into degrees
 
-    RRT alg(sys, start_point, end_point, 0.1, std::make_unique<BiasedSampling>(end_point, 0.1) , std::make_unique<WeightedEuclidianDistance>(std::vector<double>{1, 2, 2}));
+    RRT alg(sys, start_point, end_point, 2, std::make_unique<BiasedSampling>(end_point, 0.1) , std::make_unique<WeightedEuclidianDistance>(std::vector<double>{1, 2, 2}));
     RRT_Visualiser vis(window, sys);
 
     vis.setGeometricBounds({-50, -50, 0}, {50, 50, 50});

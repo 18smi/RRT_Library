@@ -237,7 +237,9 @@ public:
     }
 
     [[nodiscard]] static std::vector<double> PositionToPoint(const std::array<double, 3> &position, const double length1, const double length2) {
-        //y = ((b*a^2 + b^3 + b*r^2 - b*t^2) +- sqrt(-a^6 - 2b^2*a^4 - b^4*a^2 + 2*a^4*t^2 + 2*a^4*r^2 - a^2*t^4 - a^2*r^4 + 2*b^2*a^2*t^2 + 2*b^2*r^2*a^2 + 2*t^2*r^2*a^2))/(2*a^2 + 2*b^2)
+        if (std::sqrt(position[0]*position[0] + position[1]*position[1] + position[2]*position[2]) < length2 - length1) throw std::invalid_argument("Position entered is within arm minimum range");
+        if (std::sqrt(position[0]*position[0] + position[1]*position[1] + position[2]*position[2]) > length2 + length1) throw std::invalid_argument("Position entered is out of arm maximum range");
+
         const double effector_xy = sqrt(position[0] * position[0] + position[1] * position[1]);
         const double xy_discriminant = sqrt(-std::pow(position[2], 6) - 2*effector_xy*effector_xy*std::pow(position[2], 4) - std::pow(effector_xy, 4)*position[2]*position[2] + 2*std::pow(position[2], 4)*length2*length2 + 2*std::pow(position[2], 4)*length1*length1 - position[2]*position[2]*std::pow(length2, 4) - position[2]*position[2]*std::pow(length1, 4) + 2*effector_xy*effector_xy*position[2]*position[2]*length2*length2 + 2*effector_xy*effector_xy*position[2]*position[2]*length1*length1 + 2*position[2]*position[2]*length1*length1*length2*length2);
         double joint_xy1 = (effector_xy*position[2]*position[2] + std::pow(effector_xy, 3) + effector_xy*length1*length1 - effector_xy*length2*length2 + xy_discriminant) / (2*effector_xy*effector_xy + 2*position[2]*position[2]);
@@ -252,17 +254,27 @@ public:
             joint_xy2 = temp;
         }
 
-
-        const double base_joint_angle1 = atan2(joint_z1, joint_xy1);
-        const double base_joint_angle2 = atan2(joint_z2, joint_xy2);
-        const double joint_effector_angle1 = atan2(position[2] - joint_z1, effector_xy - joint_xy1);
-        const double joint_effector_angle2 = atan2(position[2] - joint_z2, effector_xy - joint_xy2);
+        const double base_joint_angle1 = fmod(atan2(joint_z1, joint_xy1) + 2*std::numbers::pi, 2*std::numbers::pi);
+        const double base_joint_angle2 = fmod(atan2(joint_z2, joint_xy2) + 2*std::numbers::pi, 2*std::numbers::pi);
+        const double joint_effector_angle1 = fmod(atan2(position[2] - joint_z1, effector_xy - joint_xy1) + 2*std::numbers::pi, 2*std::numbers::pi);
+        const double joint_effector_angle2 = fmod(atan2(position[2] - joint_z2, effector_xy - joint_xy2) + 2*std::numbers::pi, 2*std::numbers::pi);
 
         std::vector<double> result(3);
-        result[0] = atan2(position[1], position[0]);
+        result[0] = fmod(atan2(position[1], position[0]) + 2*std::numbers::pi, 2*std::numbers::pi);
 
         //reject imposable options and pick 1
-        if (joint_effector_angle1 <= std::numbers::pi) {
+        if (base_joint_angle1 <= std::numbers::pi ^ base_joint_angle2 <= std::numbers::pi) {
+            if (base_joint_angle1 <= std::numbers::pi) {
+                result[1] = base_joint_angle1;
+                result[2] = joint_effector_angle1;
+            }
+            else {
+                result[1] = base_joint_angle2;
+                result[2] = joint_effector_angle2;
+            }
+
+        }
+        else if (joint_effector_angle1 >= std::numbers::pi) {
             result[1] = base_joint_angle1;
             result[2] = joint_effector_angle1;
         }
